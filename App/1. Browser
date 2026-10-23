@@ -1,4 +1,4 @@
-(function () {
+jsvascript: (function () {
   let C = 'd',
     S = 'c-ns',
     $ = e => document.querySelectorAll(e);
