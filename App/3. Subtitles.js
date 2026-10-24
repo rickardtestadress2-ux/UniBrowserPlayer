@@ -96,25 +96,33 @@
         if(txt.includes('#EXT-X-MEDIA:TYPE=SUBTITLES')){
           isSubTrack = true;
           if(txt.includes('#EXT-X-KEY') || txt.includes('KEYFORMAT')) isDRM = true;
-          let m=[...txt.matchAll(/#EXT-X-MEDIA:TYPE=SUBTITLES[^]*?URI="([^"]+)"(?:[^]*?NAME="([^"]+)")?/g)];
-          for(let x of m){
-            let sUri=new URL(x[1],bUrl).href,sName=x[2]||'HLS',mTxt=await fetch(sUri).then(r=>r.text()).catch(()=>'');
-            if(mTxt.includes('#EXT-X-KEY')) isDRM = true;
-            let mBase=sUri.substring(0,sUri.lastIndexOf('/')+1),urls=mTxt.split('\n').filter(l=>l.trim()&&!l.startsWith('#')).map(l=>new URL(l.trim(),mBase).href),cues=[];
-            for(let u2 of urls){
-              if(u2.includes('.vtt')||u2.includes('sub')||u2.includes('caption')){
-                let vt=await fetch(u2).then(r=>r.text()).catch(()=>'');
-                cues.push(...parseVTT(vt));
+          
+          let lines = txt.split('\n');
+          for(let line of lines) {
+            if(line.includes('#EXT-X-MEDIA:') && line.includes('TYPE=SUBTITLES')) {
+              let uriMatch = line.match(/URI="([^"]+)"/);
+              let nameMatch = line.match(/NAME="([^"]+)"/);
+              if(uriMatch) {
+                let sUri = new URL(uriMatch[1], bUrl).href;
+                let sName = nameMatch ? nameMatch[1] : 'HLS';
+                let mTxt = await fetch(sUri).then(r=>r.text()).catch(()=>'');
+                if(mTxt.includes('#EXT-X-KEY')) isDRM = true;
+                let mBase = sUri.substring(0, sUri.lastIndexOf('/')+1);
+                let urls = mTxt.split('\n').filter(l=>l.trim()&&!l.startsWith('#')).map(l=>new URL(l.trim(),mBase).href);
+                let cues = [];
+                for(let u2 of urls){
+                  let vt = await fetch(u2).then(r=>r.text()).catch(()=>'');
+                  cues.push(...parseVTT(vt));
+                }
+                cuesCount += cues.length;
+                if(cues.length) addCues(cues, sName);
               }
             }
-            cuesCount += cues.length;
-            if(cues.length)addCues(cues,sName);
           }
         }else{
           let lines = txt.split('\n').filter(l=>l.trim()&&!l.startsWith('#'));
           let isVideo = lines.some(l => l.includes('.ts') || l.includes('.m4s') || l.includes('.mp4'));
           
-          // Om det är en videospelslista, ignorera tyst
           if(isVideo) {
             window._loadedSubs.add(u);
             return;
