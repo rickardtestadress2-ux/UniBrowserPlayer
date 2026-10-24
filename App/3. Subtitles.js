@@ -1,4 +1,4 @@
-(function(){
+javascript:(function(){
   if(window._subIv) clearInterval(window._subIv);
   if(window._subObs) window._subObs.disconnect();
 
@@ -69,7 +69,7 @@
     let v=D.querySelector('video');
     if(!v||!u||window._loadedSubs.has(u))return;
 
-    let isDRM = false, cuesCount = 0, isSubTrack = false;
+    let isDRM = false, allParsedCues = [], isSubTrack = false;
 
     try{
       let bUrl=u.substring(0,u.lastIndexOf('/')+1);
@@ -85,7 +85,7 @@
             if(b){
               let sUrl=new URL(b.textContent.trim(),bUrl).href,vt=await fetch(sUrl).then(r=>r.text());
               let parsed = parseVTT(vt);
-              cuesCount += parsed.length;
+              allParsedCues.push(...parsed);
               addCues(parsed,'DASH');
             }
           }
@@ -114,7 +114,7 @@
                   let vt = await fetch(u2).then(r=>r.text()).catch(()=>'');
                   cues.push(...parseVTT(vt));
                 }
-                cuesCount += cues.length;
+                allParsedCues.push(...cues);
                 if(cues.length) addCues(cues, sName);
               }
             }
@@ -137,7 +137,7 @@
               let vt=await fetch(u2).then(r=>r.text()).catch(()=>'');
               cues.push(...parseVTT(vt));
             }
-            cuesCount += cues.length;
+            allParsedCues.push(...cues);
             if(cues.length)addCues(cues,'HLS');
           }
         }
@@ -146,7 +146,7 @@
         if(vt.includes('WEBVTT') || vt.includes('-->')) {
           isSubTrack = true;
           let cues = parseVTT(vt);
-          cuesCount += cues.length;
+          allParsedCues.push(...cues);
           if(cues.length)addCues(cues,'VTT');
         }
       }
@@ -154,10 +154,11 @@
       window._loadedSubs.add(u);
 
       if (isSubTrack) {
-        if (isDRM || cuesCount === 0) {
+        if (isDRM || allParsedCues.length === 0) {
           alert('Undertext-URL:\n' + u + '\n\nFel: Undertexterna är DRM-skyddade/krypterade eller saknar läsbara undertextrader.');
         } else {
-          alert('Undertext hittades och lästes in!\n\nLänk:\n' + u);
+          let sampleText = allParsedCues.slice(0, 3).map((c, i) => `${i + 1}. ${c.txt.replace(/\n/g, ' ')}`).join('\n');
+          alert('Undertext hittades och lästes in!\n\nLänk:\n' + u + '\n\nUtdrag ur undertexten:\n' + sampleText);
         }
       }
     }catch(e){
