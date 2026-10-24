@@ -1,4 +1,4 @@
-(function(){
+javascript:(function(){
   if(window._subIv) clearInterval(window._subIv);
   if(window._subObs) window._subObs.disconnect();
 
@@ -9,7 +9,6 @@
   window._detectedSubs = window._detectedSubs || [];
   window._loadedSubs = window._loadedSubs || new Set();
 
-  // 1. Samla in undertext- och spellistlänkar
   let addSubUrl = u => {
     if ((u.includes('.m3u8') || u.includes('.mpd') || u.includes('.vtt')) && !window._detectedSubs.includes(u)) {
       window._detectedSubs.push(u);
@@ -27,11 +26,10 @@
     try { window._subObs.observe({ entryTypes: ['resource'] }); } catch(e){}
   }
 
-  // 2. Skapa stilregler (skapas i head, syns inte på sidan förrän UI byggs)
   if(!D.getElementById('sub-s')){
     let s=C('style');
     s.id='sub-s';
-    s.innerHTML='#sub-ctrl,.sub-b,.sub-i{all:initial!;box-sizing:border-box!;font:600 13px/1.2 sans-serif!;color:#fff!}#sub-ctrl{z-index:2147483647!;display:flex!;background:#111e!;backdrop-filter:blur(16px)!;border:1px solid #fff3!;border-radius:20px!;position:absolute!;top:20px!;right:20px!;padding:6px 10px!;gap:4px!;align-items:center!;user-select:none!;transition:opacity .3s!}#sub-ctrl.h{opacity:0!;pointer-events:none!}.sub-b{color:#fff!;cursor:pointer!;padding:6px 8px!;border-radius:10px!;background:transparent!;border:none!;display:flex!;align-items:center!;touch-action:manipulation!}.sub-b:hover{background:#ffffff22!}.sub-i{font-size:12px!;opacity:.8!;min-width:38px!;text-align:center!}.sub-d{border-left:1px solid #fff3!;margin:0 2px!;height:14px!}'.replace(/!/g,'!important');
+    s.innerHTML='#sub-ctrl,.sub-b,.sub-i{all:initial!;box-sizing:border-box!;font:600 13px/1.2 -apple-system,BlinkMacSystemFont,sans-serif!;color:#fff!}#sub-ctrl{z-index:2147483647!;display:flex!;background:rgba(17,30,30,.85)!;backdrop-filter:blur(16px)!;-webkit-backdrop-filter:blur(16px)!;border:1px solid rgba(255,255,255,.2)!;border-radius:20px!;position:absolute!;top:15px!;right:15px!;padding:6px 10px!;gap:4px!;align-items:center!;user-select:none!}.sub-b{color:#fff!;cursor:pointer!;padding:6px 8px!;border-radius:10px!;background:transparent!;border:none!;display:flex!;align-items:center!;touch-action:manipulation!}.sub-b:active{background:rgba(255,255,255,.25)!}.sub-i{font-size:12px!;opacity:.8!;min-width:38px!;text-align:center!}.sub-d{border-left:1px solid rgba(255,255,255,.2)!;margin:0 2px!;height:14px!}'.replace(/!/g,'!important');
     D.head.append(s);
   }
 
@@ -67,7 +65,6 @@
     updL();
   };
 
-  // 3. Hämta och tolka master-spellistor och undertextfiler automatiskt
   let loadUrl=async(u)=>{
     let v=D.querySelector('video');
     if(!v||!u||window._loadedSubs.has(u))return;
@@ -85,7 +82,6 @@
         }
       }else if(u.includes('.m3u8')){
         let txt=await fetch(u).then(r=>r.text());
-        // Sök efter undertextspår direkt i HLS master-spellistan
         if(txt.includes('#EXT-X-MEDIA:TYPE=SUBTITLES')){
           let m=[...txt.matchAll(/#EXT-X-MEDIA:TYPE=SUBTITLES[^]*?URI="([^"]+)"(?:[^]*?NAME="([^"]+)")?/g)];
           for(let x of m){
@@ -131,16 +127,15 @@
     if(!v||!lbl)return;
     let tr=[...v.textTracks||[]];
     if(window._subIdx<0||!tr.length||!tr[window._subIdx]){
-      lbl.innerText='OFF';
-      if(ccBtn)ccBtn.style.opacity='.5';
+      lbl.innerText = tr.length ? `OFF (${tr.length})` : 'SÖKER...';
+      if(ccBtn)ccBtn.style.opacity='.6';
     }else{
       let t=tr[window._subIdx];
-      lbl.innerText=(t.language||t.label||('Spår '+(window._subIdx+1))).toUpperCase().slice(0,3);
+      lbl.innerText=(t.language||t.label||('SPÅR '+(window._subIdx+1))).toUpperCase().slice(0,6);
       if(ccBtn)ccBtn.style.opacity='1';
     }
   };
 
-  // 4. Bygg kontrollpanelen (utan plusknapp)
   let buildUI=w=>{
     let ctrl=C('div');
     ctrl.id='sub-ctrl';
@@ -153,7 +148,7 @@
       b.onpointerdown=e=>{pd(e);fn()};
       return b;
     };
-    let ccBtn=mk('<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z"/></svg><span id="sub-lbl" style="margin-left:4px">OFF</span>',()=>{
+    let ccBtn=mk('<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z"/></svg><span id="sub-lbl" style="margin-left:4px">SÖKER...</span>',()=>{
       let v=D.querySelector('video');
       if(!v)return;
       let tr=[...v.textTracks||[]];
@@ -180,20 +175,17 @@
     };
     let div=()=>Object.assign(C('div'),{className:'sub-d'});
 
-    // Panelen innehåller endast CC-knapp, tidssynk (-0.5s / +0.5s) och textstorlek (A- / A+)
     ctrl.append(ccBtn,div(),mk('-0.5s',()=>shSync(-0.5)),sLbl,mk('+0.5s',()=>shSync(0.5)),div(),mk('A-',()=>{window._subSiz=Math.max(50,window._subSiz-15);updS()}),mk('A+',()=>{window._subSiz=Math.min(250,window._subSiz-15);updS()}));
     w.append(ctrl);
     updL();
   };
 
-  // 5. Intervall som bevakar nätverk samt skapar UI när videospelare finns
   window._subIv=setInterval(()=>{
     scanResources();
 
     let v=D.querySelector('video');
-    if(!v) return; // Gör ingenting/visar inget UI förrän en video finns
+    if(!v) return;
 
-    // Bearbeta alla upptäckta master-spellistor/undertexter automatiskt
     for(let url of window._detectedSubs){
       if(!window._loadedSubs.has(url)){
         loadUrl(url);
