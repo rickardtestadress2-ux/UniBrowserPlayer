@@ -59,7 +59,7 @@
       rw = mk(i("M11 19l-9-7 9-7v14zm11 0l-9-7 9-7v14z")),
       pBtn = mk(v.paused ? pI : sI, () => v.paused ? v.play() : v.pause()),
       ff = mk(i("M13 19l9-7-9-7v14zM2 19l9-7-9-7v14z")),
-      liveBtn = mk('● LIVE', () => { G().e > 0 && (v.currentTime = G().e - .2); }, 'vl'),
+      liveBtn = mk('● LIVE', () => { ~~G().e && (v.currentTime = G().e - .2); }, 'vl'),
       el = [ov, bar, liveBtn],
       G = () => {
         let d = v.duration,
@@ -72,7 +72,7 @@
       upd = () => {
         let { L, s, e, d } = G(), c = v.currentTime;
         fill.style.width = d ? Math.max(0, Math.min(100, (c - s) / d * 100)) + '%' : L ? '100%' : '0%';
-        liveBtn.style.display = L ? 'inline-flex' : 'none';
+        liveBtn.style.setProperty('display', L ? 'inline-flex' : 'none', 'important');
         if (L) liveBtn.style.color = !e || e - c < 4 ? '#ff4444' : '#888';
       },
       h = (b, f) => {
@@ -117,7 +117,7 @@
 
       bar.onpointerdown = x => { rt(); dr = 1; t = updX(x.clientX); bar.setPointerCapture(x.pointerId); pd(x); };
       bar.onpointermove = x => dr == 1 && (t = updX(x.clientX), rt(), pd(x));
-      bar.onpointerup = bar.onpointercancel = x => dr == 1 && (dr = 2, (G().d > 0 || (G().L && G().e > 0)) && (v.currentTime = t), rt(), pd(x));
+      bar.onpointerup = bar.onpointercancel = x => dr == 1 && (dr = 2, (G().d > 0 || (G().L&&G().e > 0)) && (v.currentTime = t), rt(), pd(x));
 
       let E = (f, r) => ['timeupdate', 'loadedmetadata', 'play', 'durationchange', 'seeked', 'progress'].forEach(e => v[r ? 'removeEventListener' : 'addEventListener'](e, f));
       v._h && E(v._h, 1);
