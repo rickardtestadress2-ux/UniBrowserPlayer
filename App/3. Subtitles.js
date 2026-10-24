@@ -7,20 +7,18 @@ javascript:(function(){
   window._subSiz=window._subSiz||100;
   window._subIdx=(window._subIdx!==undefined)?window._subIdx:-1;
   window._detectedSubs = window._detectedSubs || [];
+  window._loadedSubs = window._loadedSubs || new Set();
 
-  // Hjälpfunktion för att spara unika undertext-URL:er
   let addSubUrl = u => {
     if ((u.includes('.m3u8') || u.includes('.mpd') || u.includes('.vtt')) && !window._detectedSubs.includes(u)) {
       window._detectedSubs.push(u);
     }
   };
 
-  // Funktion för att skanna nätverksloggen
   let scanResources = () => {
     (performance.getEntriesByType('resource')||[]).forEach(e => addSubUrl(e.name));
   };
 
-  // PerformanceObserver som extra komplement om webbläsaren stöder det
   if (window.PerformanceObserver) {
     window._subObs = new PerformanceObserver(list => {
       list.getEntries().forEach(e => addSubUrl(e.name));
@@ -28,7 +26,6 @@ javascript:(function(){
     try { window._subObs.observe({ entryTypes: ['resource'] }); } catch(e){}
   }
 
-  // Skapa stilregler (skapas i head men syns inte på sidan)
   if(!D.getElementById('sub-s')){
     let s=C('style');
     s.id='sub-s';
@@ -59,7 +56,7 @@ javascript:(function(){
 
   let addCues=(cues,lbl)=>{
     let v=D.querySelector('video');
-    if(!v||!cues.length)return alert('Inga undertextrader kunde tolkas');
+    if(!v||!cues.length)return;
     let t=v.addTextTrack('subtitles',lbl||'EXT','sv');
     cues.forEach(c=>{try{t.addCue(new VTTCue(c.st,c.et,c.txt))}catch(e){}});
     let tr=[...v.textTracks||[]];
@@ -70,7 +67,8 @@ javascript:(function(){
 
   let loadUrl=async(u)=>{
     let v=D.querySelector('video');
-    if(!v||!u)return;
+    if(!v||!u||window._loadedSubs.has(u))return;
+    window._loadedSubs.add(u);
     try{
       let bUrl=u.substring(0,u.lastIndexOf('/')+1);
       if(u.includes('.mpd')){
@@ -108,9 +106,7 @@ javascript:(function(){
         let vt=await fetch(u).then(r=>r.text());
         addCues(parseVTT(vt),'VTT');
       }
-    }catch(e){
-      alert('Ett fel uppstod vid hämtning: '+e.message);
-    }
+    }catch(e){}
   };
 
   let syncCues=t=>{
@@ -156,7 +152,7 @@ javascript:(function(){
       let v=D.querySelector('video');
       if(!v)return;
       let tr=[...v.textTracks||[]];
-      if(!tr.length)return alert('Inga undertexter hittades');
+      if(!tr.length)return;
       window._subIdx=(window._subIdx+2)%(tr.length+1)-1;
       tr.forEach((t,i)=>{
         t.mode=i===window._subIdx?'showing':'disabled';
@@ -166,9 +162,8 @@ javascript:(function(){
     },'sub-cc');
 
     let addBtn=mk('<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>',()=>{
-      let detected = window._detectedSubs[window._detectedSubs.length - 1] || '';
-      let input=prompt('Klistra in URL till .m3u8, .mpd eller .vtt-fil:', detected);
-      if(input)loadUrl(input.trim());
+      let detected = window._detectedSubs[window._detectedSubs.length - 1];
+      if(detected) loadUrl(detected);
     });
 
     let sLbl=C('span');
@@ -189,14 +184,19 @@ javascript:(function(){
     updL();
   };
 
-  // Huvudloopen körs var 250ms
   window._subIv=setInterval(()=>{
-    // 1. Skanna efter spellistor/undertexter i nätverksloggen på varje tick
     scanResources();
 
-    // 2. Avbryt (visar inget UI) om ingen videospelare hittats i DOM ännu
     let v=D.querySelector('video');
     if(!v) return;
+
+    // Automatisk laddning utan dialogruta
+    if(window._detectedSubs.length > 0){
+      let latest = window._detectedSubs[window._detectedSubs.length - 1];
+      if(!window._loadedSubs.has(latest)){
+        loadUrl(latest);
+      }
+    }
 
     let w=v.parentElement;
     if(!w) return;
