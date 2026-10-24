@@ -1,4 +1,4 @@
-(function(){
+javascript:(function(){
   if(window._subIv) clearInterval(window._subIv);
   if(window._subObs) window._subObs.disconnect();
 
@@ -68,37 +68,41 @@
   let loadUrl=async(u)=>{
     let v=D.querySelector('video');
     if(!v||!u||window._loadedSubs.has(u))return;
-    window._loadedSubs.add(u);
 
-    let isDRM = false, cuesCount = 0;
+    let isDRM = false, cuesCount = 0, isSubTrack = false;
 
     try{
       let bUrl=u.substring(0,u.lastIndexOf('/')+1);
       if(u.includes('.mpd')){
         let txt=await fetch(u).then(r=>r.text());
-        if(txt.includes('ContentProtection') || txt.includes('cenc:')) isDRM = true;
-        let xml=new DOMParser().parseFromString(txt,'text/xml'),aSets=[...xml.querySelectorAll('AdaptationSet')].filter(a=>a.getAttribute('contentType')==='text'||a.getAttribute('mimeType')?.includes('vtt'));
-        for(let a of aSets){
-          let b=a.querySelector('BaseURL');
-          if(b){
-            let sUrl=new URL(b.textContent.trim(),bUrl).href,vt=await fetch(sUrl).then(r=>r.text());
-            let parsed = parseVTT(vt);
-            cuesCount += parsed.length;
-            addCues(parsed,'DASH');
+        let xml=new DOMParser().parseFromString(txt,'text/xml');
+        let aSets=[...xml.querySelectorAll('AdaptationSet')].filter(a=>a.getAttribute('contentType')==='text'||a.getAttribute('mimeType')?.includes('vtt')||a.getAttribute('mimeType')?.includes('ttml'));
+        if(aSets.length) {
+          isSubTrack = true;
+          if(txt.includes('ContentProtection') || txt.includes('cenc:')) isDRM = true;
+          for(let a of aSets){
+            let b=a.querySelector('BaseURL');
+            if(b){
+              let sUrl=new URL(b.textContent.trim(),bUrl).href,vt=await fetch(sUrl).then(r=>r.text());
+              let parsed = parseVTT(vt);
+              cuesCount += parsed.length;
+              addCues(parsed,'DASH');
+            }
           }
         }
       }else if(u.includes('.m3u8')){
         let txt=await fetch(u).then(r=>r.text());
-        if(txt.includes('#EXT-X-KEY') || txt.includes('KEYFORMAT')) isDRM = true;
 
         if(txt.includes('#EXT-X-MEDIA:TYPE=SUBTITLES')){
+          isSubTrack = true;
+          if(txt.includes('#EXT-X-KEY') || txt.includes('KEYFORMAT')) isDRM = true;
           let m=[...txt.matchAll(/#EXT-X-MEDIA:TYPE=SUBTITLES[^]*?URI="([^"]+)"(?:[^]*?NAME="([^"]+)")?/g)];
           for(let x of m){
-            let sUri=new URL(x[1],bUrl).href,sName=x[2]||'HLS',mTxt=await fetch(sUri).then(r=>r.text());
+            let sUri=new URL(x[1],bUrl).href,sName=x[2]||'HLS',mTxt=await fetch(sUri).then(r=>r.text()).catch(()=>'');
             if(mTxt.includes('#EXT-X-KEY')) isDRM = true;
             let mBase=sUri.substring(0,sUri.lastIndexOf('/')+1),urls=mTxt.split('\n').filter(l=>l.trim()&&!l.startsWith('#')).map(l=>new URL(l.trim(),mBase).href),cues=[];
             for(let u2 of urls){
-              if(u2.includes('.vtt')||u2.includes('sub')){
+              if(u2.includes('.vtt')||u2.includes('sub')||u2.includes('caption')){
                 let vt=await fetch(u2).then(r=>r.text()).catch(()=>'');
                 cues.push(...parseVTT(vt));
               }
@@ -107,28 +111,50 @@
             if(cues.length)addCues(cues,sName);
           }
         }else{
-          let urls=txt.split('\n').filter(l=>l.trim()&&!l.startsWith('#')).map(l=>new URL(l.trim(),bUrl).href),cues=[];
-          for(let u2 of urls){
-            let vt=await fetch(u2).then(r=>r.text()).catch(()=>'');
-            cues.push(...parseVTT(vt));
+          let lines = txt.split('\n').filter(l=>l.trim()&&!l.startsWith('#'));
+          let isVideo = lines.some(l => l.includes('.ts') || l.includes('.m4s') || l.includes('.mp4'));
+          
+          // Om det är en videospelslista, ignorera tyst
+          if(isVideo) {
+            window._loadedSubs.add(u);
+            return;
           }
-          cuesCount += cues.length;
-          if(cues.length)addCues(cues,'HLS');
+
+          let isSubPlaylist = lines.some(l => l.includes('.vtt') || l.includes('sub') || l.includes('caption')) || txt.includes('WEBVTT');
+          if(isSubPlaylist) {
+            isSubTrack = true;
+            if(txt.includes('#EXT-X-KEY')) isDRM = true;
+            let urls=lines.map(l=>new URL(l.trim(),bUrl).href),cues=[];
+            for(let u2 of urls){
+              let vt=await fetch(u2).then(r=>r.text()).catch(()=>'');
+              cues.push(...parseVTT(vt));
+            }
+            cuesCount += cues.length;
+            if(cues.length)addCues(cues,'HLS');
+          }
         }
       }else{
         let vt=await fetch(u).then(r=>r.text());
-        let cues = parseVTT(vt);
-        cuesCount += cues.length;
-        if(cues.length)addCues(cues,'VTT');
+        if(vt.includes('WEBVTT') || vt.includes('-->')) {
+          isSubTrack = true;
+          let cues = parseVTT(vt);
+          cuesCount += cues.length;
+          if(cues.length)addCues(cues,'VTT');
+        }
       }
 
-      if (isDRM || cuesCount === 0) {
-        alert('Undertext-URL:\n' + u + '\n\nFel: Undertexterna är DRM-skyddade/krypterade eller saknar läsbara undertextspår.');
-      } else {
-        alert('Undertext hittades och lästes in!\n\nLänk:\n' + u);
+      window._loadedSubs.add(u);
+
+      if (isSubTrack) {
+        if (isDRM || cuesCount === 0) {
+          alert('Undertext-URL:\n' + u + '\n\nFel: Undertexterna är DRM-skyddade/krypterade eller saknar läsbara undertextrader.');
+        } else {
+          alert('Undertext hittades och lästes in!\n\nLänk:\n' + u);
+        }
       }
     }catch(e){
-      alert('Undertext-URL:\n' + u + '\n\nFelmeddelande: ' + e.message);
+      window._loadedSubs.add(u);
+      if(isSubTrack) alert('Undertext-URL:\n' + u + '\n\nFelmeddelande: ' + e.message);
     }
   };
 
