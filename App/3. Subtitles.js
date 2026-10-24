@@ -1,4 +1,4 @@
-javascript:(function(){
+(function(){
   if(window._subIv) clearInterval(window._subIv);
   if(window._subObs) window._subObs.disconnect();
 
@@ -9,6 +9,7 @@ javascript:(function(){
   window._detectedSubs = window._detectedSubs || [];
   window._loadedSubs = window._loadedSubs || new Set();
 
+  // 1. Samla in undertext- och spellistlänkar
   let addSubUrl = u => {
     if ((u.includes('.m3u8') || u.includes('.mpd') || u.includes('.vtt')) && !window._detectedSubs.includes(u)) {
       window._detectedSubs.push(u);
@@ -26,6 +27,7 @@ javascript:(function(){
     try { window._subObs.observe({ entryTypes: ['resource'] }); } catch(e){}
   }
 
+  // 2. Skapa stilregler (skapas i head, syns inte på sidan förrän UI byggs)
   if(!D.getElementById('sub-s')){
     let s=C('style');
     s.id='sub-s';
@@ -65,6 +67,7 @@ javascript:(function(){
     updL();
   };
 
+  // 3. Hämta och tolka master-spellistor och undertextfiler automatiskt
   let loadUrl=async(u)=>{
     let v=D.querySelector('video');
     if(!v||!u||window._loadedSubs.has(u))return;
@@ -82,6 +85,7 @@ javascript:(function(){
         }
       }else if(u.includes('.m3u8')){
         let txt=await fetch(u).then(r=>r.text());
+        // Sök efter undertextspår direkt i HLS master-spellistan
         if(txt.includes('#EXT-X-MEDIA:TYPE=SUBTITLES')){
           let m=[...txt.matchAll(/#EXT-X-MEDIA:TYPE=SUBTITLES[^]*?URI="([^"]+)"(?:[^]*?NAME="([^"]+)")?/g)];
           for(let x of m){
@@ -100,7 +104,7 @@ javascript:(function(){
             let vt=await fetch(u2).then(r=>r.text()).catch(()=>'');
             cues.push(...parseVTT(vt));
           }
-          addCues(cues,'HLS');
+          if(cues.length)addCues(cues,'HLS');
         }
       }else{
         let vt=await fetch(u).then(r=>r.text());
@@ -136,6 +140,7 @@ javascript:(function(){
     }
   };
 
+  // 4. Bygg kontrollpanelen (utan plusknapp)
   let buildUI=w=>{
     let ctrl=C('div');
     ctrl.id='sub-ctrl';
@@ -161,11 +166,6 @@ javascript:(function(){
       updL();
     },'sub-cc');
 
-    let addBtn=mk('<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>',()=>{
-      let detected = window._detectedSubs[window._detectedSubs.length - 1];
-      if(detected) loadUrl(detected);
-    });
-
     let sLbl=C('span');
     sLbl.className='sub-i';
     let updSyncLbl=()=>{sLbl.innerText=(window._subDel>=0?'+':'')+window._subDel.toFixed(1)+'s'};
@@ -179,22 +179,24 @@ javascript:(function(){
       if(window._subIdx>=0&&tr[window._subIdx])syncCues(tr[window._subIdx]);
     };
     let div=()=>Object.assign(C('div'),{className:'sub-d'});
-    ctrl.append(ccBtn,addBtn,div(),mk('-0.5s',()=>shSync(-0.5)),sLbl,mk('+0.5s',()=>shSync(0.5)),div(),mk('A-',()=>{window._subSiz=Math.max(50,window._subSiz-15);updS()}),mk('A+',()=>{window._subSiz=Math.min(250,window._subSiz-15);updS()}));
+
+    // Panelen innehåller endast CC-knapp, tidssynk (-0.5s / +0.5s) och textstorlek (A- / A+)
+    ctrl.append(ccBtn,div(),mk('-0.5s',()=>shSync(-0.5)),sLbl,mk('+0.5s',()=>shSync(0.5)),div(),mk('A-',()=>{window._subSiz=Math.max(50,window._subSiz-15);updS()}),mk('A+',()=>{window._subSiz=Math.min(250,window._subSiz-15);updS()}));
     w.append(ctrl);
     updL();
   };
 
+  // 5. Intervall som bevakar nätverk samt skapar UI när videospelare finns
   window._subIv=setInterval(()=>{
     scanResources();
 
     let v=D.querySelector('video');
-    if(!v) return;
+    if(!v) return; // Gör ingenting/visar inget UI förrän en video finns
 
-    // Automatisk laddning utan dialogruta
-    if(window._detectedSubs.length > 0){
-      let latest = window._detectedSubs[window._detectedSubs.length - 1];
-      if(!window._loadedSubs.has(latest)){
-        loadUrl(latest);
+    // Bearbeta alla upptäckta master-spellistor/undertexter automatiskt
+    for(let url of window._detectedSubs){
+      if(!window._loadedSubs.has(url)){
+        loadUrl(url);
       }
     }
 
