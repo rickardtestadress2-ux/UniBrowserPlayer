@@ -1,4 +1,4 @@
-javascript: (function () {
+(function () {
   let D = document,
     Q = e => D.querySelector(e),
     C = e => D.createElement(e),
