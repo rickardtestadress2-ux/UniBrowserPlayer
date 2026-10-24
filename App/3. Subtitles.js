@@ -1,4 +1,4 @@
-javascript:(function(){
+(function(){
   if(window._subIv) clearInterval(window._subIv);
   if(window._subObs) window._subObs.disconnect();
 
